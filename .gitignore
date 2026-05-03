@@ -1,0 +1,32 @@
+# Python
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+.Python
+ml_venv/
+web_venv/
+venv/
+env/
+ENV/
+.venv
+
+# IDE
+.vscode/
+.idea/
+*.swp
+*.swo
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Model files (если большой)
+*.h5
+*.keras
+
+# Logs
+*.logml_venv/
+__pycache__/
+*.pyc
+.env
