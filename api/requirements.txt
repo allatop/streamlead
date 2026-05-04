@@ -1,6 +1,6 @@
 fastapi
 uvicorn[standard]
 python-multipart
-tflite-runtime
+tensorflow
 numpy
 Pillow
