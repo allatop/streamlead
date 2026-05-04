@@ -18,11 +18,13 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
-# 🔧 Надёжные пути (работают и при python main.py, и при uvicorn)
+# 🔧 Пути к моделям
 BASE_DIR = os.path.dirname(os.path.abspath(__file__))
 MODELS_DIR = os.path.join(BASE_DIR, "..", "models")
 
-ANIMAL_MODEL_PATH = os.path.join(MODELS_DIR, "model1_tf213.h5")  # 👈 Обновлено
+# Используем TFLite модель для животных (лёгкая, ~10-30 МБ)
+ANIMAL_MODEL_PATH = os.path.join(MODELS_DIR, "animal_model.tflite")
+# Старую H5 модель больше не используем
 MNIST_MODEL_PATH = os.path.join(MODELS_DIR, "mnist_model.tflite")
 
 ANIMAL_CLASSES = ['Кошка', 'Собака', 'Панда']
@@ -30,19 +32,24 @@ ANIMAL_CLASSES = ['Кошка', 'Собака', 'Панда']
 # ================= ЗАГРУЗКА МОДЕЛЕЙ =================
 print("📦 Загрузка моделей...")
 
-# Модель для животных
+# TFLite модель для животных
+animal_interpreter = None
+animal_loaded = False
 try:
-    animal_model = tf.keras.models.load_model(ANIMAL_MODEL_PATH, compile=False)
-    print(f"✅ Модель животных загружена: {os.path.basename(ANIMAL_MODEL_PATH)}")
+    animal_interpreter = tf.lite.Interpreter(model_path=ANIMAL_MODEL_PATH)
+    animal_interpreter.allocate_tensors()
+    print(f"✅ TFLite модель животных загружена: {os.path.basename(ANIMAL_MODEL_PATH)}")
     animal_loaded = True
 except Exception as e:
-    print(f"❌ Ошибка загрузки модели животных: {e}")
+    print(f"❌ Ошибка загрузки TFLite модели животных: {e}")
     animal_loaded = False
 
 # MNIST модель (TFLite)
+mnist_interpreter = None
+mnist_loaded = False
 try:
-    interpreter = tf.lite.Interpreter(model_path=MNIST_MODEL_PATH)
-    interpreter.allocate_tensors()
+    mnist_interpreter = tf.lite.Interpreter(model_path=MNIST_MODEL_PATH)
+    mnist_interpreter.allocate_tensors()
     print(f"✅ MNIST модель загружена: {os.path.basename(MNIST_MODEL_PATH)}")
     mnist_loaded = True
 except Exception as e:
@@ -57,18 +64,18 @@ def preprocess_animal_image(image, target_size=(128, 128)):
         image = image.convert('RGB')
     image = image.resize(target_size)
     img_array = np.array(image).astype(np.float32) / 255.0
-    return np.expand_dims(img_array, axis=0)
+    return np.expand_dims(img_array, axis=0).astype(np.float32)
 
 def preprocess_mnist_image(image):
     if image.mode != 'L':
         image = image.convert('L')
     image = image.resize((28, 28), Image.Resampling.LANCZOS)
     img_array = np.array(image, dtype=np.float32)
-    # Инверсия, если фон светлый (стандарт MNIST: чёрные цифры на белом фоне)
+    # Инверсия, если фон светлый
     if np.mean(img_array) > 127:
         img_array = 255 - img_array
     img_array = img_array / 255.0
-    return img_array.reshape(1, 28, 28, 1)
+    return img_array.reshape(1, 28, 28, 1).astype(np.float32)
 
 # ================= ЭНДПОИНТЫ =================
 @app.get("/")
@@ -79,10 +86,14 @@ async def root():
         "mnist_model": mnist_loaded
     }
 
+@app.get("/health")
+async def health():
+    return {"status": "ok"}
+
 @app.post("/predict/animal/{model_name}")
 async def predict_animal(model_name: str, file: UploadFile = File(...)):
     if not animal_loaded:
-        # Демо-режим
+        # Демо-режим (на случай, если модель не загрузилась)
         pred_idx = random.randint(0, 2)
         probs = [0.7, 0.2, 0.1]
         random.shuffle(probs)
@@ -98,7 +109,13 @@ async def predict_animal(model_name: str, file: UploadFile = File(...)):
         contents = await file.read()
         image = Image.open(io.BytesIO(contents))
         processed = preprocess_animal_image(image)
-        predictions = animal_model.predict(processed, verbose=0)[0]
+        
+        # TFLite инференс
+        input_details = animal_interpreter.get_input_details()
+        output_details = animal_interpreter.get_output_details()
+        animal_interpreter.set_tensor(input_details[0]['index'], processed)
+        animal_interpreter.invoke()
+        predictions = animal_interpreter.get_tensor(output_details[0]['index'])[0]
         predicted_class = int(np.argmax(predictions))
         
         return {
@@ -125,11 +142,11 @@ async def predict_digit(file: UploadFile = File(...)):
         image = Image.open(io.BytesIO(contents))
         processed = preprocess_mnist_image(image)
         
-        input_details = interpreter.get_input_details()
-        output_details = interpreter.get_output_details()
-        interpreter.set_tensor(input_details[0]['index'], processed)
-        interpreter.invoke()
-        predictions = interpreter.get_tensor(output_details[0]['index'])[0]
+        input_details = mnist_interpreter.get_input_details()
+        output_details = mnist_interpreter.get_output_details()
+        mnist_interpreter.set_tensor(input_details[0]['index'], processed)
+        mnist_interpreter.invoke()
+        predictions = mnist_interpreter.get_tensor(output_details[0]['index'])[0]
         predicted_class = int(np.argmax(predictions))
         
         return {
