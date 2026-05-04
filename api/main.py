@@ -3,7 +3,7 @@ import io
 import random
 import numpy as np
 from PIL import Image
-import tensorflow as tf
+import tensorflow as tf  # Это нужно только для tf.lite, он есть в tflite-runtime
 from fastapi import FastAPI, UploadFile, File
 from fastapi.responses import JSONResponse
 from fastapi.middleware.cors import CORSMiddleware
@@ -22,9 +22,7 @@ app.add_middleware(
 BASE_DIR = os.path.dirname(os.path.abspath(__file__))
 MODELS_DIR = os.path.join(BASE_DIR, "..", "models")
 
-# Используем TFLite модель для животных (лёгкая, ~10-30 МБ)
 ANIMAL_MODEL_PATH = os.path.join(MODELS_DIR, "animal_model.tflite")
-# Старую H5 модель больше не используем
 MNIST_MODEL_PATH = os.path.join(MODELS_DIR, "mnist_model.tflite")
 
 ANIMAL_CLASSES = ['Кошка', 'Собака', 'Панда']
@@ -35,26 +33,30 @@ print("📦 Загрузка моделей...")
 # TFLite модель для животных
 animal_interpreter = None
 animal_loaded = False
-try:
-    animal_interpreter = tf.lite.Interpreter(model_path=ANIMAL_MODEL_PATH)
-    animal_interpreter.allocate_tensors()
-    print(f"✅ TFLite модель животных загружена: {os.path.basename(ANIMAL_MODEL_PATH)}")
-    animal_loaded = True
-except Exception as e:
-    print(f"❌ Ошибка загрузки TFLite модели животных: {e}")
-    animal_loaded = False
+if os.path.exists(ANIMAL_MODEL_PATH):
+    try:
+        animal_interpreter = tf.lite.Interpreter(model_path=ANIMAL_MODEL_PATH)
+        animal_interpreter.allocate_tensors()
+        print(f"✅ TFLite модель животных загружена: {os.path.basename(ANIMAL_MODEL_PATH)}")
+        animal_loaded = True
+    except Exception as e:
+        print(f"❌ Ошибка загрузки TFLite модели животных: {e}")
+else:
+    print(f"⚠️ Файл модели животных не найден: {ANIMAL_MODEL_PATH}")
 
 # MNIST модель (TFLite)
 mnist_interpreter = None
 mnist_loaded = False
-try:
-    mnist_interpreter = tf.lite.Interpreter(model_path=MNIST_MODEL_PATH)
-    mnist_interpreter.allocate_tensors()
-    print(f"✅ MNIST модель загружена: {os.path.basename(MNIST_MODEL_PATH)}")
-    mnist_loaded = True
-except Exception as e:
-    print(f"❌ Ошибка загрузки MNIST: {e}")
-    mnist_loaded = False
+if os.path.exists(MNIST_MODEL_PATH):
+    try:
+        mnist_interpreter = tf.lite.Interpreter(model_path=MNIST_MODEL_PATH)
+        mnist_interpreter.allocate_tensors()
+        print(f"✅ MNIST модель загружена: {os.path.basename(MNIST_MODEL_PATH)}")
+        mnist_loaded = True
+    except Exception as e:
+        print(f"❌ Ошибка загрузки MNIST: {e}")
+else:
+    print(f"⚠️ Файл MNIST модели не найден: {MNIST_MODEL_PATH}")
 
 # ================= ПРЕПРОЦЕССИНГ =================
 def preprocess_animal_image(image, target_size=(128, 128)):
@@ -92,8 +94,8 @@ async def health():
 
 @app.post("/predict/animal/{model_name}")
 async def predict_animal(model_name: str, file: UploadFile = File(...)):
-    if not animal_loaded:
-        # Демо-режим (на случай, если модель не загрузилась)
+    # Если модель не загружена — демо-режим
+    if not animal_loaded or animal_interpreter is None:
         pred_idx = random.randint(0, 2)
         probs = [0.7, 0.2, 0.1]
         random.shuffle(probs)
@@ -134,7 +136,7 @@ async def predict_animal(model_name: str, file: UploadFile = File(...)):
 
 @app.post("/predict/digit")
 async def predict_digit(file: UploadFile = File(...)):
-    if not mnist_loaded:
+    if not mnist_loaded or mnist_interpreter is None:
         return JSONResponse(status_code=500, content={"error": "MNIST model not loaded"})
     
     try:
