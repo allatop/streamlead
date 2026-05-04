@@ -8,7 +8,7 @@ from streamlit_drawable_canvas import st_canvas
 
 st.set_page_config(page_title="Классификатор изображений", layout="wide")
 
-API_URL = "http://localhost:8000"
+API_URL = "https://streamlead.onrender.com"
 
 st.title("🐾 Классификатор изображений")
 st.markdown("---")
@@ -23,7 +23,7 @@ results_data = {
     "Статус": ["✅ Лучшая", "👍 Хорошая", "❌ Слабая"]
 }
 df = pd.DataFrame(results_data)
-st.dataframe(df, use_column_width=True, hide_index=True)
+st.dataframe(df, hide_index=True)
 
 # График сравнения
 fig, ax = plt.subplots(figsize=(10, 5))
