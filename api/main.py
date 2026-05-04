@@ -3,7 +3,7 @@ import io
 import random
 import numpy as np
 from PIL import Image
-import tensorflow as tf  # Это нужно только для tf.lite, он есть в tflite-runtime
+from tflite_runtime.interpreter import Interpreter  # 👈 Импорт без tensorflow
 from fastapi import FastAPI, UploadFile, File
 from fastapi.responses import JSONResponse
 from fastapi.middleware.cors import CORSMiddleware
@@ -18,7 +18,7 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
-# 🔧 Пути к моделям
+# Пути к моделям
 BASE_DIR = os.path.dirname(os.path.abspath(__file__))
 MODELS_DIR = os.path.join(BASE_DIR, "..", "models")
 
@@ -35,7 +35,7 @@ animal_interpreter = None
 animal_loaded = False
 if os.path.exists(ANIMAL_MODEL_PATH):
     try:
-        animal_interpreter = tf.lite.Interpreter(model_path=ANIMAL_MODEL_PATH)
+        animal_interpreter = Interpreter(model_path=ANIMAL_MODEL_PATH)
         animal_interpreter.allocate_tensors()
         print(f"✅ TFLite модель животных загружена: {os.path.basename(ANIMAL_MODEL_PATH)}")
         animal_loaded = True
@@ -49,7 +49,7 @@ mnist_interpreter = None
 mnist_loaded = False
 if os.path.exists(MNIST_MODEL_PATH):
     try:
-        mnist_interpreter = tf.lite.Interpreter(model_path=MNIST_MODEL_PATH)
+        mnist_interpreter = Interpreter(model_path=MNIST_MODEL_PATH)
         mnist_interpreter.allocate_tensors()
         print(f"✅ MNIST модель загружена: {os.path.basename(MNIST_MODEL_PATH)}")
         mnist_loaded = True
@@ -94,7 +94,7 @@ async def health():
 
 @app.post("/predict/animal/{model_name}")
 async def predict_animal(model_name: str, file: UploadFile = File(...)):
-    # Если модель не загружена — демо-режим
+    # Демо-режим, если модель не загружена
     if not animal_loaded or animal_interpreter is None:
         pred_idx = random.randint(0, 2)
         probs = [0.7, 0.2, 0.1]
