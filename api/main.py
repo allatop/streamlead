@@ -3,7 +3,7 @@ import io
 import random
 import numpy as np
 from PIL import Image
-from tflite_runtime.interpreter import Interpreter  # 👈 Импорт без tensorflow
+import tensorflow as tf
 from fastapi import FastAPI, UploadFile, File
 from fastapi.responses import JSONResponse
 from fastapi.middleware.cors import CORSMiddleware
@@ -18,47 +18,45 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
-# Пути к моделям
 BASE_DIR = os.path.dirname(os.path.abspath(__file__))
 MODELS_DIR = os.path.join(BASE_DIR, "..", "models")
 
+# Используем TFLite модель для животных (лёгкая, ~10-30 МБ)
 ANIMAL_MODEL_PATH = os.path.join(MODELS_DIR, "animal_model.tflite")
 MNIST_MODEL_PATH = os.path.join(MODELS_DIR, "mnist_model.tflite")
 
 ANIMAL_CLASSES = ['Кошка', 'Собака', 'Панда']
 
-# ================= ЗАГРУЗКА МОДЕЛЕЙ =================
 print("📦 Загрузка моделей...")
 
-# TFLite модель для животных
+# Загрузка TFLite модели для животных
 animal_interpreter = None
 animal_loaded = False
 if os.path.exists(ANIMAL_MODEL_PATH):
     try:
-        animal_interpreter = Interpreter(model_path=ANIMAL_MODEL_PATH)
+        animal_interpreter = tf.lite.Interpreter(model_path=ANIMAL_MODEL_PATH)
         animal_interpreter.allocate_tensors()
-        print(f"✅ TFLite модель животных загружена: {os.path.basename(ANIMAL_MODEL_PATH)}")
+        print(f"✅ Модель животных загружена (TFLite)")
         animal_loaded = True
     except Exception as e:
-        print(f"❌ Ошибка загрузки TFLite модели животных: {e}")
+        print(f"❌ Ошибка загрузки модели животных: {e}")
 else:
-    print(f"⚠️ Файл модели животных не найден: {ANIMAL_MODEL_PATH}")
+    print(f"⚠️ Файл {ANIMAL_MODEL_PATH} не найден")
 
-# MNIST модель (TFLite)
+# Загрузка MNIST модели (TFLite)
 mnist_interpreter = None
 mnist_loaded = False
 if os.path.exists(MNIST_MODEL_PATH):
     try:
-        mnist_interpreter = Interpreter(model_path=MNIST_MODEL_PATH)
+        mnist_interpreter = tf.lite.Interpreter(model_path=MNIST_MODEL_PATH)
         mnist_interpreter.allocate_tensors()
-        print(f"✅ MNIST модель загружена: {os.path.basename(MNIST_MODEL_PATH)}")
+        print(f"✅ MNIST модель загружена")
         mnist_loaded = True
     except Exception as e:
         print(f"❌ Ошибка загрузки MNIST: {e}")
 else:
-    print(f"⚠️ Файл MNIST модели не найден: {MNIST_MODEL_PATH}")
+    print(f"⚠️ Файл {MNIST_MODEL_PATH} не найден")
 
-# ================= ПРЕПРОЦЕССИНГ =================
 def preprocess_animal_image(image, target_size=(128, 128)):
     if image.mode == 'RGBA':
         image = image.convert('RGB')
@@ -73,13 +71,11 @@ def preprocess_mnist_image(image):
         image = image.convert('L')
     image = image.resize((28, 28), Image.Resampling.LANCZOS)
     img_array = np.array(image, dtype=np.float32)
-    # Инверсия, если фон светлый
     if np.mean(img_array) > 127:
         img_array = 255 - img_array
     img_array = img_array / 255.0
     return img_array.reshape(1, 28, 28, 1).astype(np.float32)
 
-# ================= ЭНДПОИНТЫ =================
 @app.get("/")
 async def root():
     return {
@@ -94,8 +90,8 @@ async def health():
 
 @app.post("/predict/animal/{model_name}")
 async def predict_animal(model_name: str, file: UploadFile = File(...)):
-    # Демо-режим, если модель не загружена
-    if not animal_loaded or animal_interpreter is None:
+    if not animal_loaded:
+        # Демо-режим
         pred_idx = random.randint(0, 2)
         probs = [0.7, 0.2, 0.1]
         random.shuffle(probs)
@@ -112,7 +108,6 @@ async def predict_animal(model_name: str, file: UploadFile = File(...)):
         image = Image.open(io.BytesIO(contents))
         processed = preprocess_animal_image(image)
         
-        # TFLite инференс
         input_details = animal_interpreter.get_input_details()
         output_details = animal_interpreter.get_output_details()
         animal_interpreter.set_tensor(input_details[0]['index'], processed)
@@ -136,7 +131,7 @@ async def predict_animal(model_name: str, file: UploadFile = File(...)):
 
 @app.post("/predict/digit")
 async def predict_digit(file: UploadFile = File(...)):
-    if not mnist_loaded or mnist_interpreter is None:
+    if not mnist_loaded:
         return JSONResponse(status_code=500, content={"error": "MNIST model not loaded"})
     
     try:
