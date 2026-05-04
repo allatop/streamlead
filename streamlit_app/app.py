@@ -23,7 +23,7 @@ results_data = {
     "Статус": ["✅ Лучшая", "👍 Хорошая", "❌ Слабая"]
 }
 df = pd.DataFrame(results_data)
-st.dataframe(df, use_container_width=True, hide_index=True)
+st.dataframe(df, use_column_width=True, hide_index=True)
 
 # График сравнения
 fig, ax = plt.subplots(figsize=(10, 5))
@@ -85,17 +85,17 @@ if task == "🐕 Распознавание животных":
                 image = Image.open(uploaded)
                 if image.mode == 'RGBA':
                     image = image.convert('RGB')
-                st.image(image, caption="Ваше изображение", use_container_width=True)
+                st.image(image, caption="Ваше изображение", use_column_width=True)
         else:
             camera = st.camera_input("Сделайте фото")
             if camera:
                 image = Image.open(camera)
                 if image.mode == 'RGBA':
                     image = image.convert('RGB')
-                st.image(image, caption="Ваше фото", use_container_width=True)
+                st.image(image, caption="Ваше фото", use_column_width=True)
     
     with col2:
-        if image and st.button("🔍 Распознать", type="primary", use_container_width=True):
+        if image and st.button("🔍 Распознать", type="primary", use_column_width=True):
             with st.spinner("Анализируем изображение..."):
                 img_bytes = io.BytesIO()
                 image.save(img_bytes, format='JPEG', quality=95)
@@ -184,7 +184,7 @@ else:
             if canvas_result.image_data is not None:
                 image = Image.fromarray(canvas_result.image_data.astype('uint8'), 'RGBA')
                 image = image.convert('L')
-                st.image(image, caption="Ваш рисунок", use_container_width=True)
+                st.image(image, caption="Ваш рисунок", use_column_width=True)
         
         elif input_method == "📁 Загрузить фото":
             uploaded = st.file_uploader("Выберите изображение с цифрой", type=["jpg", "jpeg", "png"])
@@ -192,17 +192,17 @@ else:
                 image = Image.open(uploaded)
                 if image.mode != 'L':
                     image = image.convert('L')
-                st.image(image, caption="Ваше изображение", use_container_width=True)
+                st.image(image, caption="Ваше изображение", use_column_width=True)
         else:
             camera = st.camera_input("Сфотографируйте цифру")
             if camera:
                 image = Image.open(camera)
                 if image.mode != 'L':
                     image = image.convert('L')
-                st.image(image, caption="Ваше фото", use_container_width=True)
+                st.image(image, caption="Ваше фото", use_column_width=True)
     
     with col2:
-        if image and st.button("🔢 Распознать цифру", type="primary", use_container_width=True):
+        if image and st.button("🔢 Распознать цифру", type="primary", use_column_width=True):
             with st.spinner("Анализируем..."):
                 img_bytes = io.BytesIO()
                 image.save(img_bytes, format='PNG')
