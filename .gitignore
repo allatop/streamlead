@@ -22,7 +22,7 @@ ENV/
 Thumbs.db
 
 # Model files (если большой)
-*.h5
+
 *.keras
 
 # Logs
