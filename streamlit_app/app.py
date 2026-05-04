@@ -95,7 +95,7 @@ if task == "🐕 Распознавание животных":
                 st.image(image, caption="Ваше фото", use_column_width=True)
     
     with col2:
-        if image and st.button("🔍 Распознать", type="primary", use_column_width=True):
+        if image and st.button("🔍 Распознать", type="primary"):
             with st.spinner("Анализируем изображение..."):
                 img_bytes = io.BytesIO()
                 image.save(img_bytes, format='JPEG', quality=95)
@@ -202,7 +202,7 @@ else:
                 st.image(image, caption="Ваше фото", use_column_width=True)
     
     with col2:
-        if image and st.button("🔢 Распознать цифру", type="primary", use_column_width=True):
+        if image and st.button("🔢 Распознать цифру", type="primary"):
             with st.spinner("Анализируем..."):
                 img_bytes = io.BytesIO()
                 image.save(img_bytes, format='PNG')
